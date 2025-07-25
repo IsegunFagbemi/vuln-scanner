@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Vulnerability Scanner</title>
+</head>
+<body>
+    <h1>Security Header Scanner</h1>
+    <form action="/scan" method="post">
+        <label for="url">Enter URL:</label>
+        <input type="text" name="url" placeholder="https://example.com" required>
+        <button type="submit">Scan</button>
+    </form>
+
+    {% if missing %}
+        <h2>Missing Security Headers:</h2>
+        <ul>
+            {% for header in missing %}
+                <li>{{ header }}</li>
+            {% endfor %}
+        </ul>
+    {% elif scanned %}
+        <p>✅ All security headers are present!</p>
+    {% endif %}
+</body>
+</html>
