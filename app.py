@@ -1,5 +1,9 @@
 from flask import Flask, request, render_template_string
 import requests
+import ssl
+import socket
+from datetime import datetime
+from urllib.parse import urlparse
 
 app = Flask(__name__)
 
@@ -19,7 +23,23 @@ def check_security_headers(url):
         return missing, None
     except Exception as e:
         return [], str(e)
-
+    
+def check_ssl_expiry(url):
+    try:
+        parsed_url = urlparse(url)
+        hostname = parsed_url.hostname or parsed_url.path.split("/")[0]
+        context = ssl.create_default_context()
+        with socket.create_connection((hostname, 443), timeout=5) as sock:
+            with context.wrap_socket(sock, server_hostname=hostname) as ssock:
+                cert = ssock.getpeercert()
+                expiry_date = datetime.strptime(cert['notAfter'], "%b %d %H:%M:%S %Y %Z")
+                days_left = (expiry_date - datetime.utcnow()).days
+                if days_left <= 0:
+                    return False, f"Certificate expired on {expiry_date}"
+                else:
+                    return True, f"Valid certificate (expires in {days_left} days)"
+    except Exception as e:
+        return False, f"SSL check failed: {e}"
 @app.route("/", methods=["GET", "POST"])
 def home():
     result = ""
@@ -29,6 +49,13 @@ def home():
             url = "http://" + url  # Add http if user didn't
 
         missing, error = check_security_headers(url)
+        ssl_valid, ssl_msg = check_ssl_expiry(url)
+        result += f"<p><strong>SSL/TLS Check:<strong> {ssl_msg}</p>"
+
+        if ssl_valid:
+            result += f"<p style='color:green;'><strong>SSL/TLS Check:<strong> {ssl_msg}</p>"
+        else:
+            result += f"<p style='color:red;'><strong>SSL/TLS Check:<strong> {ssl_msg}</p>"
 
         if error:
             result = f"<p style='color:red;'>Error scanning URL: {error}</p>"
